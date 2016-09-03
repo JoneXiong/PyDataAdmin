@@ -3,3 +3,5 @@
 .settings
 .project
 .pydevproject
+.idea/
+*.db
