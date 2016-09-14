@@ -119,10 +119,10 @@ MIDDLEWARE_CLASSES = (
     # 'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
 
-ROOT_URLCONF = 'demo.urls'
+ROOT_URLCONF = 'start.urls'
 
 # Python dotted path to the WSGI application used by Django's runserver.
-WSGI_APPLICATION = 'demo.wsgi.application'
+WSGI_APPLICATION = 'start.wsgi.application'
 
 TEMPLATE_DIRS = (
     # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
@@ -195,3 +195,5 @@ QINIU_CONF = {
               'secret_key': 'nn7-tSEdEGKpo07GK0xuDI6TkgL3-PoUIEIboMx9',
               'bucket': 'meilatest'
               }
+
+XADMIN_SOCIAL_ENABLE = False
