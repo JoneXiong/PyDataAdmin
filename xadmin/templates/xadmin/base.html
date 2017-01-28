@@ -2,8 +2,8 @@
 <html lang="zh_CN">
 <head>
   {% block extrameta %}
-  <meta name="description" content="">
-  <meta name="author" content="">
+  <meta name="description" content="" />
+  <meta name="author" content="" />
   {% endblock %}
   {% block blockbots %}<meta name="robots" content="NONE,NOARCHIVE" />{% endblock %}
   <title>{% block title %}{% endblock %}</title>
@@ -14,6 +14,9 @@
   <link rel="stylesheet" type="text/css" href="{% static "xadmin/css/themes/bootstrap-xadmin.css" %}" />
   {% endif %}
   {% vendor 'font-awesome.css' 'xadmin.main.css' 'xadmin.plugins.css' 'xadmin.responsive.css' %}
+    {% if head_fix %}
+        <link href="{% static "xadmin/css/xadmin.main.frame.css" %}" rel="stylesheet">
+    {% endif %}
   {{ media.css }}
   {% block extrastyle %}{% endblock %}
   {% vendor 'jquery.js' %}
@@ -22,6 +25,9 @@
     window.__admin_media_prefix__ = "{% filter escapejs %}{% static "xadmin/" %}{% endfilter %}";
     window.__admin_path_prefix__ = "{% filter escapejs %}{{ indexurl }}{% endfilter %}";
   </script>
+  {% if head_fix %}
+    <script type="text/javascript" src="{% static "xadmin/js/site_config.js" %}"></script>
+  {% endif %} 
   <script type="text/javascript" src="{% url 'xadmin:jsi18n' %}"></script>
   {% block extrahead %}{% endblock %}
   {% view_block 'extrahead' %}

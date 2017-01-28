@@ -144,7 +144,7 @@ class PermissionAdmin(object):
     show_name.is_column = True
 
     model_icon = 'fa fa-lock'
-    list_display = ('show_name', )
+    list_display = ('show_name', 'codename')
     list_filter = ('name', 'codename', 'content_type')
     app_label = 'xadmin'
     menu_group = 'auth_group'
@@ -197,6 +197,7 @@ class ChangePasswordView(ModelAdminView):
     model = User
     change_password_form = AdminPasswordChangeForm
     change_user_password_template = None
+    app_label = 'xadmin'
 
     @csrf_protect_m
     def get(self, request, object_id):

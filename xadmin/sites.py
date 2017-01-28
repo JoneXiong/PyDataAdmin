@@ -61,10 +61,15 @@ class AdminSite(object):
     site_title = None         # 网站的标题
     site_footer = None         # 网站的下角标文字
     menu_style = 'accordion'    # 网站左侧菜单风格 可选项 default、accordion
+    head_fix = False
     app_dict = SortedDict()   # app模块全局字典
     sys_menu = {}                   # 网站菜单全局字典
     sys_menu_loaded = False  # 菜单是否加载过
     apps_icons = {'xadmin': 'fa fa-circle-o'}
+
+    login_view = None
+    main_view = None #frame框架main页试图
+    show_default_index = True
 
     
     def __init__(self, name='xadmin'):
@@ -92,7 +97,7 @@ class AdminSite(object):
 
         self.check_dependencies()
 
-        self.model_admins_order = 0
+        self.model_admins_order = 0 # 当前系统分配菜单的索引值
 
     def copy_registry(self):
         """
@@ -136,7 +141,7 @@ class AdminSite(object):
         else:
             raise ImproperlyConfigured(u'The registered view class %s isn\'t subclass of %s' %(admin_view_class.__name__, BaseView.__name__))
 
-    def register_view(self, path, admin_view_class, name):
+    def register_view(self, path, admin_view_class, name, update=False):
         """
         注册 AdminView 类，一般用于创建独立的 admin 页面，例如登陆，介绍页面，帮助页面等。
 
@@ -144,8 +149,11 @@ class AdminSite(object):
         :param admin_view_class: 注册的 AdminView 类
         :param name: view对应的url name
         """
-        self._registry_views.append((path, admin_view_class, name))
-        
+        if update==False:
+            self._registry_views.append((path, admin_view_class, name))
+        else:
+            self._registry_views.insert(0,(path, admin_view_class, name))
+
     def register_page(self, page_view_class):
         name = page_view_class.__name__
         self._registry_pages.append(page_view_class)
@@ -273,7 +281,8 @@ class AdminSite(object):
         def inner(request, *args, **kwargs):
             if not self.has_permission(request) and getattr(view, 'need_site_permission', True):
                 # 没有权限则跳转到登录页
-                return self.create_admin_view(self.login_view)(request, *args, **kwargs)
+                _login_view = getattr(view, 'login_view', self.login_view) or self.login_view
+                return self.create_admin_view(_login_view)(request, *args, **kwargs)
             return view(request, *args, **kwargs)
 
         if not cacheable:
@@ -406,6 +415,28 @@ class AdminSite(object):
         :param option_class: Model 的 OptionClass，保存对该 Model 的相关定制
         """
         return self.get_view_class(admin_view_class, option_class).as_view()
+    
+    def gen_view(self, clz):
+        def wrap(view, cacheable=False):
+            '''
+            url请求处理的起点，默认不做view缓存
+            '''
+            def wrapper(*args, **kwargs):
+                return self.site_view_decor(view, cacheable)(*args, **kwargs)
+            return update_wrapper(wrapper, view)
+        return wrap(self.create_admin_view(clz))
+    
+    def gen_model_view(self, clz):
+        model = getattr(clz, 'model')
+        admin_class = self._registry[model]
+        def wrap(view, cacheable=False):
+            '''
+            url请求处理的起点，默认不做view缓存
+            '''
+            def wrapper(*args, **kwargs):
+                return self.site_view_decor(view, cacheable)(*args, **kwargs)
+            return update_wrapper(wrapper, view)
+        return wrap(self.create_model_admin_view(clz, model, admin_class))
 
     def get_urls(self):
         from django.conf.urls import patterns, url, include
@@ -500,8 +531,11 @@ class AdminSite(object):
         return '%s.%s_%s' % (model._meta.app_label, name, model._meta.module_name)
     
     def get_sys_menu(self):
+        '''
+        加载系统所有菜单
+        '''
         for model, model_admin in self._registry.items():
-            if getattr(model_admin, 'hidden_menu', False):
+            if getattr(model_admin, 'hide_menu', False) or getattr(model_admin, 'hidden_menu', False):
                 continue
             if hasattr(model_admin, 'menu_group'):
                 m_menu_group = model_admin.menu_group or '_default_group'
@@ -524,7 +558,7 @@ class AdminSite(object):
                 m_menu['_default_group']['menus'].append(model_dict)
         
         for page in self._registry_pages:
-            if getattr(page, 'hidden_menu', False):
+            if getattr(page, 'hide_menu', False)or getattr(page, 'hidden_menu', False):
                 continue
             if hasattr(page, 'menu_group'):
                 m_menu_group = page.menu_group or '_default_group'
@@ -550,6 +584,9 @@ class AdminSite(object):
         self.sys_menu_loaded = True
     
     def get_app_menu(self, app_label):
+        '''
+        获取某个APP的菜单
+        '''
         if not self.sys_menu_loaded:self.get_sys_menu()
         m_menu = self.sys_menu[app_label]
         m_app = self.app_dict[app_label]
@@ -561,16 +598,41 @@ class AdminSite(object):
         if len(m_menu['_default_group'])>0:
                 ret.append(m_menu['_default_group'])
         return ret
+
+    def get_menu(self):
+        '''
+        获取站点所有菜单
+        '''
+        if not self.sys_menu_loaded:self.get_sys_menu()
+        ret = []
+        for k,v in self.sys_menu.items():
+            app_label = k
+            m_menu = v
+            m_app = self.app_dict[app_label]
+
+            if hasattr(m_app,'menus'):
+                m_menus = m_app.menus
+                for e in m_menus:
+                    ret.append(m_menu[e[0]])
+            if len(m_menu['_default_group'])>0:
+                    ret.append(m_menu['_default_group'])
+        return ret
     
     def get_site_menu(self, select_app):
+        '''
+        获取APP列表菜单
+        '''
         if not self.sys_menu_loaded:self.get_sys_menu()
-        ret = [{
-                    'app_lavel': '',
-                    'title': u'面板',
-                    'url': self.url_for('index'),
-                    'icon': '',
-                    'selected': not select_app
-                }]
+        if self.show_default_index:
+            ret = [{
+                        'app_label': '',
+                        'title': u'面板',
+                        'url': self.url_for('index'),
+                        'icon': '',
+                        'selected': not select_app
+                    }]
+        else:
+            ret = []
         for app_label,mod in self.app_dict.iteritems():
             if hasattr(mod,'verbose_name'):
                 m_first_url = None
@@ -593,12 +655,13 @@ class AdminSite(object):
                             m_first_url = '#'
 
                 ret.append({
-                            'app_lavel': app_label,
+                            'app_label': app_label,
                             'title': getattr(mod,'verbose_name', unicode(capfirst(app_label))  ),
                             'url': m_first_url,
                             'icon': '',
                             'selected': app_label==select_app
                             })
+                mod.index_url = m_first_url
         return ret
         
 

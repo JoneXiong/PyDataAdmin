@@ -178,14 +178,14 @@ class Common(object):
         便捷方法，方便生成 HttpResponse，如果 response_type 为 ``json`` 会自动转为 json 格式后输出
         """
         if response_type == 'json':
-            response = HttpResponse(mimetype="application/json; charset=UTF-8")
+            response = HttpResponse(content_type='application/json; charset=UTF-8')
             response.write(
                 json.dumps(content, cls=JSONEncoder, ensure_ascii=False))
             return response
         return HttpResponse(content)
     
     def render_json(self, content):
-        response = HttpResponse(mimetype="application/json; charset=UTF-8")
+        response = HttpResponse(content_type='application/json; charset=UTF-8')
         response.write(
             json.dumps(content, cls=JSONEncoder, ensure_ascii=False))
         return response
@@ -332,6 +332,7 @@ class BaseView(Common, View):
 
         update_wrapper(view, cls, updated=())
         view.need_site_permission = cls.need_site_permission
+        view.login_view = getattr(cls, 'login_view', None)
         if not cls.csrf:
             view.csrf_exempt = True
         return view
@@ -394,16 +395,16 @@ class SiteView(BaseView):
         else:
             return self.user.has_perm(need_perm)
         
-    def get_nav_menu(self):
-        # DEBUG模式会首先尝试从SESSION中取得缓存的 app 菜单项
-        menu_session_key = 'nav_menu_%s'%self.app_label
+    def get_nav_menu(self, app_label=None):
+        # 非DEBUG模式会首先尝试从SESSION中取得缓存的 app 菜单项
+        menu_session_key = app_label and 'nav_menu_%s'%app_label or 'nav_menu'
         if not settings.DEBUG and menu_session_key in self.request.session:
             nav_menu = json.loads(self.request.session[menu_session_key])
         else:
-            if hasattr(self, 'app_label') and self.app_label:
-                menus = copy.deepcopy(self.admin_site.get_app_menu(self.app_label)) #copy.copy(self.get_nav_menu())
+            if app_label:
+                menus = copy.deepcopy(self.admin_site.get_app_menu(app_label)) #copy.copy(self.get_nav_menu())
             else:
-                menus = []
+                menus = copy.deepcopy(self.admin_site.get_menu())
 
             def filter_item(item):
                 if 'menus' in item:
@@ -422,6 +423,13 @@ class SiteView(BaseView):
                 self.request.session[menu_session_key] = json.dumps(nav_menu)
                 self.request.session.modified = True
         return nav_menu
+
+    def get_site_menu(self):
+        if hasattr(self, 'app_label'):
+            menus = self.admin_site.get_site_menu(self.app_label)
+            return menus
+        else:
+            return []
  
     def deal_selected(self, nav_menu):
         def check_selected(menu, path):
@@ -454,17 +462,19 @@ class SiteView(BaseView):
 
         nav_menu = []
         if '_pop' not in self.request.GET:
-            nav_menu = self.get_nav_menu()
+            _app_label = hasattr(self, 'app_label') and self.app_label or None
+            nav_menu = self.get_nav_menu(_app_label)
             self.deal_selected(nav_menu)
         
         m_site = self.admin_site
         context.update({
             'menu_template': defs.BUILDIN_STYLES.get(m_site.menu_style, defs.BUILDIN_STYLES['default']), 
             'nav_menu': nav_menu,
-            'site_menu': hasattr(self, 'app_label') and m_site.get_site_menu(self.app_label) or [],
+            'site_menu': self.get_site_menu(),
             'site_title': m_site.site_title or defs.DEFAULT_SITE_TITLE,
             'site_footer': m_site.site_footer or defs.DEFAULT_SITE_FOOTER,
-            'breadcrumbs': self.get_breadcrumb()
+            'breadcrumbs': self.get_breadcrumb(),
+            'head_fix': m_site.head_fix
         })
 
         return context
@@ -479,7 +489,8 @@ class SiteView(BaseView):
         return icon
     
     def block_top_account_menu(self, context, nodes):
-        return '<li><a href="%s"><i class="fa fa-key"></i> %s</a></li>' % (self.get_admin_url('account_password'), _('Change Password'))
+        a_class = self.admin_site.head_fix and 'class="J_menuItem"' or '' 
+        return '<li><a %s href="%s"><i class="fa fa-key"></i> %s</a></li>' % (a_class, self.get_admin_url('account_password'), _('Change Password'))
 
     @filter_hook
     def get_breadcrumb(self):
@@ -487,6 +498,8 @@ class SiteView(BaseView):
         导航链接基础部分
         '''
         import xadmin
+        if self.admin_site.head_fix:
+            return []
         base = [{
             'url': self.get_admin_url('index'),
             'title': _('Home')
@@ -495,7 +508,7 @@ class SiteView(BaseView):
             app_mod = self.admin_site.app_dict[self.app_label]
             pref_url = xadmin.ROOT_PATH_NAME and '/'+xadmin.ROOT_PATH_NAME or ''
             base.append({
-                         'url': '%s/index/%s/'%(pref_url, self.app_label),
+                         'url': app_mod.index_url,#'%s/index/%s/'%(pref_url, self.app_label),
                          'title':  hasattr(app_mod,'verbose_name') and app_mod.verbose_name or self.app_label
                          })
         return base

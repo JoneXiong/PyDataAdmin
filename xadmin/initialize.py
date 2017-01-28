@@ -11,6 +11,7 @@ from django.utils.module_loading import module_has_submodule
 def register_builtin_views(site):
     from xadmin import views
     site.register_view(r'^$', views.IndexView, name='index')
+    site.register_view(r'^main.html$', views.MainView, name='main')
     site.register_view(r'^login/$', views.LoginView, name='login')
     site.register_view(r'^logout/$', views.LogoutView, name='logout')
     site.register_view(r'^settings/user$', views.UserSettingView, name='user_settings')
@@ -60,7 +61,7 @@ def autodiscover():
         site.app_dict[app_label] = mod
         
         # app级菜单初始化
-        site.sys_menu[app_label] = {'_default_group':{'title': u'其他', 'icon': 'group_configure', 'menus': []}  }
+        site.sys_menu[app_label] = {'_default_group':{'title': u'其他', 'icon': 'fa-th-large', 'menus': []}  }
         if hasattr(mod,'menus'):
             m_menus = mod.menus
             for e in m_menus:

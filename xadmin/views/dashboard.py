@@ -70,7 +70,7 @@ class UserWidgetAdmin(object):
     list_filter = ['user', 'widget_type', 'page_id']
     list_display_links = ('widget_type',)
     user_fields = ['user']
-    #hidden_menu = True
+    #hide_menu = True
 
     wizard_form_list = (
         (_(u"Widget Type"), ('page_id', 'widget_type')),
@@ -159,6 +159,9 @@ class Dashboard(SiteView):
 
     @filter_hook
     def get_widget(self, widget_or_id, data=None):
+        '''
+        实例化widget
+        '''
         try:
             if isinstance(widget_or_id, UserWidget):
                 widget = widget_or_id
@@ -213,13 +216,13 @@ class Dashboard(SiteView):
         '''
         if self.widget_customiz:
             portal_pos = UserSettings.objects.filter(
-                user=self.user, key=self.get_portal_key())
+                user__id=self.user.id, key=self.get_portal_key())
             if len(portal_pos):
                 portal_pos = portal_pos[0].value
                 widgets = []
 
                 if portal_pos:
-                    user_widgets = dict([(uw.id, uw) for uw in UserWidget.objects.filter(user=self.user, page_id=self.get_page_id())])
+                    user_widgets = dict([(uw.id, uw) for uw in UserWidget.objects.filter(user__id=self.user.id, page_id=self.get_page_id())])
                     for col in portal_pos.split('|'):
                         ws = []
                         for wid in col.split(','):

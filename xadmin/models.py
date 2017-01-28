@@ -20,13 +20,8 @@ from manager import ModelManager
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
 class NewBase(ModelBase):
-    def __new__(cls, name, bases, attrs):
-        ret = ModelBase.__new__(cls, name, bases, attrs)
-        if hasattr(ret, 'init_related_lookup'):
-            ret.init_related_lookup()
-        return ret
-    
-    
+    pass
+
 class ExtModel(object):
     @classmethod
     def merge_class(cls, target_cls):
@@ -36,15 +31,15 @@ class ExtModel(object):
             if hasattr(cls, k):
                 logging.warning("class %s has attr %s, but only warning", cls.__name__, k)
             setattr(cls, k, v)
-    
-class BaseModel(six.with_metaclass(NewBase), models.Model, ExtModel):
+
+class BaseModel(models.Model, ExtModel):
     objects = ModelManager()
     had_init_related_lookup = False
 
     class Meta:
         abstract = True
-        
-models.Model = BaseModel
+
+#models.Model = BaseModel
 
 def add_view_permissions(sender, **kwargs):
     """
@@ -71,6 +66,7 @@ try:
 except:
     pass
 
+#################### 公共注入部分结束 ###################
 
 class Bookmark(models.Model):
     title = models.CharField(_(u'Title'), max_length=128)
@@ -112,20 +108,20 @@ class UserSettings(models.Model):
     class Meta:
         verbose_name = _(u'User Setting')
         verbose_name_plural = _('User Settings')
-        
-        
+
+
 class SystemSettings(models.Model):
     key = models.CharField(_('Settings Key'), max_length=256)
     value = models.TextField(_('Settings Content'))
     create_time = models.DateTimeField('创建时间', auto_now_add=True)
     update_time = models.DateTimeField('更新时间', auto_now=True)
-    
+
     def __unicode__(self):
         return self.key
 
     class Meta:
-        verbose_name = _(u'System Setting')
-        verbose_name_plural = _('System Settings')
+        verbose_name = u'系统设置'
+        verbose_name_plural = u'系统设置'
 
 
 class UserWidget(models.Model):

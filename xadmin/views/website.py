@@ -7,15 +7,16 @@ from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.views.decorators.cache import never_cache
 from django.contrib.auth.views import login
 from django.contrib.auth.views import logout
-from django.http import HttpResponse
+from django.http import HttpResponse,HttpResponseRedirect
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import authenticate
 
-from base import BaseView, filter_hook
+from base import BaseView, filter_hook, SiteView
 from dashboard import Dashboard
 from xadmin.models import UserSettings
 from xadmin.layout import FormHelper
+from xadmin import defs
 
 
 class IndexView(Dashboard):
@@ -24,6 +25,36 @@ class IndexView(Dashboard):
 
     def get_page_id(self):
         return 'home'
+
+class MainView(SiteView):
+    title = _("Main Dashboard")
+    template = 'xadmin/main.html'
+    app_label = None
+
+    @filter_hook
+    def get_context(self):
+        context = {
+                'admin_view': self, 
+                'media': self.media, 
+                'base_template': self.base_template
+                }
+        
+        nav_menu = self.get_nav_menu()
+        m_site = self.admin_site
+        context.update({
+            'menu_template': defs.BUILDIN_STYLES['inspinia'], 
+            'nav_menu': nav_menu,
+            #'site_menu': hasattr(self, 'app_label') and m_site.get_site_menu(self.app_label) or [],
+            'site_title': m_site.site_title or defs.DEFAULT_SITE_TITLE,
+            'site_footer': m_site.site_footer or defs.DEFAULT_SITE_FOOTER,
+            #'breadcrumbs': self.get_breadcrumb(),
+            #'head_fix': m_site.head_fix
+        })
+        return context
+
+    @never_cache
+    def get(self, request, *args, **kwargs):
+        return self.template_response(self.template, self.get_context())
 
 
 class UserSettingView(BaseView):
@@ -134,7 +165,8 @@ class LogoutView(BaseView):
             defaults['template_name'] = self.logout_template
 
         self.update_params(defaults)
-        return logout(request, **defaults)
+        logout(request, **defaults)
+        return HttpResponseRedirect(self.get_admin_url('index'))
 
     @never_cache
     def post(self, request, *args, **kwargs):
